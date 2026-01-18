@@ -4,6 +4,9 @@ import type { OpenCodeServerState } from "./types"
 // Type-only imports (these are erased at runtime)
 import type { OpencodeClient } from "@opencode-ai/sdk"
 
+const DEFAULT_PORT = 4096
+const DEFAULT_URL = `http://127.0.0.1:${DEFAULT_PORT}`
+
 // Dynamically imported SDK functions
 let createOpencodeServer: typeof import("@opencode-ai/sdk").createOpencodeServer
 let createOpencodeClient: typeof import("@opencode-ai/sdk").createOpencodeClient
@@ -16,9 +19,25 @@ async function loadSdk() {
   }
 }
 
+/**
+ * Check if an OpenCode server is already running on the default port
+ */
+async function checkExistingServer(): Promise<boolean> {
+  try {
+    const response = await fetch(`${DEFAULT_URL}/health`, {
+      method: "GET",
+      signal: AbortSignal.timeout(2000),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
 class OpenCodeServerManager extends EventEmitter {
   private server: { url: string; close: () => void } | null = null
   private client: OpencodeClient | null = null
+  private usingExternalServer = false
   private state: OpenCodeServerState = {
     status: "stopped",
     url: null,
@@ -48,7 +67,6 @@ class OpenCodeServerManager extends EventEmitter {
 
   async start(directory?: string): Promise<void> {
     if (this.state.status === "running") {
-      console.log("[OpenCode] Server already running")
       return
     }
 
@@ -61,38 +79,49 @@ class OpenCodeServerManager extends EventEmitter {
       }
       this.emit("state-change", this.state)
 
-      console.log("[OpenCode] Starting server...")
-
       // Load SDK dynamically (ESM module)
       await loadSdk()
 
-      // Use SDK to start the server
-      this.server = await createOpencodeServer({
-        hostname: "127.0.0.1",
-        port: 4096,
-        timeout: 30000, // 30 seconds timeout
-      })
+      // Check if a server is already running on the default port
+      const existingServerRunning = await checkExistingServer()
+      
+      if (existingServerRunning) {
+        // Reuse the existing server
+        console.log("[OpenCode] Found existing server, connecting to it")
+        this.usingExternalServer = true
+        this.server = null // We didn't start it, so we shouldn't close it
+        
+        // Create client pointing to existing server
+        this.client = createOpencodeClient({
+          baseUrl: DEFAULT_URL,
+          directory,
+        })
+      } else {
+        // Start a new server
+        this.usingExternalServer = false
+        this.server = await createOpencodeServer({
+          hostname: "127.0.0.1",
+          port: DEFAULT_PORT,
+          timeout: 30000, // 30 seconds timeout
+        })
 
-      console.log(`[OpenCode] Server started at ${this.server.url}`)
-
-      // Create client
-      this.client = createOpencodeClient({
-        baseUrl: this.server.url,
-        directory,
-      })
+        // Create client
+        this.client = createOpencodeClient({
+          baseUrl: this.server.url,
+          directory,
+        })
+      }
 
       // Verify connection by getting project info (lightweight check)
       try {
-        const projects = await this.client.project.list()
-        console.log(`[OpenCode] Server connection verified, projects: ${projects.data?.length ?? 0}`)
-      } catch (e) {
+        await this.client.project.list()
+      } catch {
         // It's okay if this fails - server might not have a project yet
-        console.log("[OpenCode] Server started (no projects yet)")
       }
 
       this.state = {
         status: "running",
-        url: this.server.url,
+        url: this.usingExternalServer ? DEFAULT_URL : this.server!.url,
         error: null,
         directory: directory || null,
       }
@@ -111,13 +140,12 @@ class OpenCodeServerManager extends EventEmitter {
   }
 
   async shutdown(): Promise<void> {
-    console.log("[OpenCode] Shutting down server...")
-
-    // Close server
-    if (this.server) {
+    // Only close the server if we started it (not if we connected to an existing one)
+    if (this.server && !this.usingExternalServer) {
       this.server.close()
-      this.server = null
     }
+    this.server = null
+    this.usingExternalServer = false
 
     this.client = null
     this.state = {
@@ -136,13 +164,12 @@ class OpenCodeServerManager extends EventEmitter {
     onEvent: (event: unknown) => void,
     onError?: (error: Error) => void
   ): { unsubscribe: () => void; connected: Promise<void> } {
-    if (!this.server) {
+    if (!this.state.url) {
       throw new Error("Server not running")
     }
 
     // Build the SSE URL with directory query param
-    const eventSourceUrl = `${this.server.url}/event?directory=${encodeURIComponent(directory)}`
-    console.log(`[OpenCode] Subscribing to SSE: ${eventSourceUrl}`)
+    const eventSourceUrl = `${this.state.url}/event?directory=${encodeURIComponent(directory)}`
 
     const abortController = new AbortController()
     let resolveConnected!: () => void
@@ -170,7 +197,6 @@ class OpenCodeServerManager extends EventEmitter {
           throw new Error("No response body for SSE")
         }
 
-        console.log("[OpenCode] SSE connection established")
         resolveConnected()
 
         const reader = response.body.getReader()
@@ -180,7 +206,6 @@ class OpenCodeServerManager extends EventEmitter {
         while (true) {
           const { done, value } = await reader.read()
           if (done) {
-            console.log("[OpenCode] SSE stream ended")
             break
           }
 
@@ -201,10 +226,9 @@ class OpenCodeServerManager extends EventEmitter {
                 const jsonStr = line.slice(6) // Remove "data: " prefix
                 try {
                   const data = JSON.parse(jsonStr)
-                  console.log("[OpenCode] SSE event:", data.type)
                   onEvent(data)
-                } catch (e) {
-                  console.warn("[OpenCode] SSE parse error:", e, "raw:", jsonStr.slice(0, 100))
+                } catch {
+                  // Ignore parse errors
                 }
               }
             }
@@ -212,10 +236,8 @@ class OpenCodeServerManager extends EventEmitter {
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
-          console.log("[OpenCode] SSE subscription aborted")
           return
         }
-        console.error("[OpenCode] SSE error:", error)
         rejectConnected(error as Error)
         onError?.(error as Error)
       }
@@ -223,7 +245,6 @@ class OpenCodeServerManager extends EventEmitter {
 
     return {
       unsubscribe: () => {
-        console.log("[OpenCode] Unsubscribing from SSE")
         abortController.abort()
       },
       connected: connectedPromise,

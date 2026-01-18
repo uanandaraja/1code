@@ -11,7 +11,6 @@ const POSTHOG_DESKTOP_KEY = import.meta.env.MAIN_VITE_POSTHOG_KEY
 const POSTHOG_HOST = import.meta.env.MAIN_VITE_POSTHOG_HOST || "https://us.i.posthog.com"
 
 let posthog: PostHog | null = null
-let currentUserId: string | null = null
 let userOptedOut = false // Synced from renderer
 
 // Check if we're in development mode
@@ -85,10 +84,8 @@ export function capture(
 
   if (!posthog) return
 
-  const distinctId = currentUserId || "anonymous"
-
   posthog.capture({
-    distinctId,
+    distinctId: "anonymous",
     event: eventName,
     properties: {
       ...getCommonProperties(),
@@ -97,47 +94,7 @@ export function capture(
   })
 }
 
-/**
- * Identify a user
- */
-export function identify(
-  userId: string,
-  traits?: Record<string, any>,
-) {
-  currentUserId = userId
 
-  // Skip in development mode
-  if (isDev()) return
-
-  // Skip if user opted out
-  if (userOptedOut) return
-
-  if (!posthog) return
-
-  posthog.identify({
-    distinctId: userId,
-    properties: {
-      ...getCommonProperties(),
-      ...traits,
-    },
-  })
-}
-
-/**
- * Get current user ID
- */
-export function getCurrentUserId(): string | null {
-  return currentUserId
-}
-
-/**
- * Reset user identification (on logout)
- */
-export function reset() {
-  currentUserId = null
-  // PostHog Node.js SDK doesn't have a reset method
-  // Events will be sent as anonymous until next identify
-}
 
 /**
  * Shutdown PostHog and flush pending events
@@ -162,15 +119,7 @@ export function trackAppOpened() {
   })
 }
 
-/**
- * Track successful authentication
- */
-export function trackAuthCompleted(userId: string, email?: string) {
-  identify(userId, email ? { email } : undefined)
-  capture("auth_completed", {
-    user_id: userId,
-  })
-}
+
 
 /**
  * Track project opened

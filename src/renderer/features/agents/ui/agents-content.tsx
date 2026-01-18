@@ -694,12 +694,8 @@ export function AgentsContent() {
   // Note: Cmd+E archive hotkey is handled in AgentsSidebar to share undo stack
 
   const handleSignOut = async () => {
-    // Check if running in Electron desktop app
-    if (typeof window !== "undefined" && window.desktopApi) {
-      // Use desktop logout which clears the token and shows login page
-      await window.desktopApi.logout()
-    } else {
-      // Web: use Clerk sign out
+    // Web: use Clerk sign out (desktop doesn't need sign out anymore)
+    if (typeof window !== "undefined" && !window.desktopApi) {
       await signOut({ redirectUrl: window.location.pathname })
     }
   }

@@ -1,22 +1,17 @@
 "use client"
 
-import { atom } from "jotai"
-import { type SettingsTab } from "../../../lib/atoms"
-
-const agentsSettingsDialogActiveTabAtom = atom<SettingsTab | null>(null)
 import { cn } from "../../../lib/utils"
 import { useAtom } from "jotai"
+import { agentsSettingsDialogActiveTabAtom, type SettingsTab } from "../../../lib/atoms"
 import { X } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import {
   EyeOpenFilledIcon,
-  ProfileIconFilled,
   OriginalMCPIcon,
 } from "../../../components/ui/icons"
 import { AgentsAppearanceTab } from "./settings-tabs/agents-appearance-tab"
-import { AgentsProfileTab } from "./settings-tabs/agents-profile-tab"
 import { AgentsMcpTab } from "../../../components/dialogs/settings-tabs/agents-mcp-tab"
 import { AgentsDebugTab } from "../../../components/dialogs/settings-tabs/agents-debug-tab"
 import { Bug } from "lucide-react"
@@ -30,12 +25,6 @@ interface AgentsSettingsDialogProps {
 }
 
 const ALL_TABS = [
-  {
-    id: "profile" as SettingsTab,
-    label: "Account",
-    icon: ProfileIconFilled,
-    description: "Manage your account settings",
-  },
   {
     id: "appearance" as SettingsTab,
     label: "Appearance",
@@ -130,8 +119,6 @@ export function AgentsSettingsDialog({
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case "profile":
-        return <AgentsProfileTab />
       case "appearance":
         return <AgentsAppearanceTab />
       case "mcp":

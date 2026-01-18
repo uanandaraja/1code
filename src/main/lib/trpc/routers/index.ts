@@ -1,8 +1,6 @@
 import { router } from "../index"
 import { projectsRouter } from "./projects"
 import { chatsRouter } from "./chats"
-import { claudeRouter } from "./claude"
-import { claudeCodeRouter } from "./claude-code"
 import { opencodeRouter } from "./opencode"
 import { terminalRouter } from "./terminal"
 import { externalRouter } from "./external"
@@ -21,9 +19,10 @@ export function createAppRouter(getWindow: () => BrowserWindow | null) {
   return router({
     projects: projectsRouter,
     chats: chatsRouter,
-    claude: claudeRouter,
-    claudeCode: claudeCodeRouter,
-    opencode: opencodeRouter, // New: OpenCode integration (multi-provider)
+    // OpenCode router (multi-provider AI backend)
+    // Also aliased as 'claude' for backward compatibility with renderer code
+    opencode: opencodeRouter,
+    claude: opencodeRouter,
     terminal: terminalRouter,
     external: externalRouter,
     files: filesRouter,

@@ -6,13 +6,11 @@ import { X, Bug, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { agentsSettingsDialogActiveTabAtom, type SettingsTab } from "../../lib/atoms"
 import {
-  ProfileIconFilled,
   EyeOpenFilledIcon,
   SlidersFilledIcon,
 } from "../../icons"
 import { SkillIconFilled, CustomAgentIconFilled, OriginalMCPIcon } from "../ui/icons"
 import { AgentsAppearanceTab } from "./settings-tabs/agents-appearance-tab"
-import { AgentsProfileTab } from "./settings-tabs/agents-profile-tab"
 import { AgentsPreferencesTab } from "./settings-tabs/agents-preferences-tab"
 import { AgentsDebugTab } from "./settings-tabs/agents-debug-tab"
 import { AgentsSkillsTab } from "./settings-tabs/agents-skills-tab"
@@ -45,12 +43,6 @@ interface AgentsSettingsDialogProps {
 }
 
 const ALL_TABS = [
-  {
-    id: "profile" as SettingsTab,
-    label: "Account",
-    icon: ProfileIconFilled,
-    description: "Manage your account settings",
-  },
   {
     id: "appearance" as SettingsTab,
     label: "Appearance",
@@ -200,8 +192,6 @@ export function AgentsSettingsDialog({
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case "profile":
-        return <AgentsProfileTab />
       case "appearance":
         return <AgentsAppearanceTab />
       case "preferences":

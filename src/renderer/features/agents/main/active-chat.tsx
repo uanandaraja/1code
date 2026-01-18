@@ -101,7 +101,6 @@ import {
   justCreatedIdsAtom,
   lastSelectedModelIdAtom,
   loadingSubChatsAtom,
-  pendingAuthRetryMessageAtom,
   pendingPrMessageAtom,
   pendingReviewMessageAtom,
   pendingUserQuestionsAtom,
@@ -1404,58 +1403,7 @@ function ChatViewInner({
     }
   }, [pendingQuestions, setPendingQuestions])
 
-  // Watch for pending auth retry message (after successful OAuth flow)
-  const [pendingAuthRetry, setPendingAuthRetry] = useAtom(
-    pendingAuthRetryMessageAtom,
-  )
 
-  useEffect(() => {
-    // Only retry when:
-    // 1. There's a pending message
-    // 2. readyToRetry is true (set by modal on OAuth success)
-    // 3. We're in the correct chat
-    // 4. Not currently streaming
-    if (
-      pendingAuthRetry &&
-      pendingAuthRetry.readyToRetry &&
-      pendingAuthRetry.subChatId === subChatId &&
-      !isStreaming
-    ) {
-      // Clear the pending message immediately to prevent double-sending
-      setPendingAuthRetry(null)
-
-      // Build message parts
-      const parts: Array<
-        { type: "text"; text: string } | { type: "data-image"; data: any }
-      > = [{ type: "text", text: pendingAuthRetry.prompt }]
-
-      // Add images if present
-      if (pendingAuthRetry.images && pendingAuthRetry.images.length > 0) {
-        for (const img of pendingAuthRetry.images) {
-          parts.push({
-            type: "data-image",
-            data: {
-              base64Data: img.base64Data,
-              mediaType: img.mediaType,
-              filename: img.filename,
-            },
-          })
-        }
-      }
-
-      // Send the message to Claude
-      sendMessage({
-        role: "user",
-        parts,
-      })
-    }
-  }, [
-    pendingAuthRetry,
-    isStreaming,
-    sendMessage,
-    setPendingAuthRetry,
-    subChatId,
-  ])
 
   const handlePlanApproval = useCallback(
     async (toolUseId: string, approved: boolean) => {

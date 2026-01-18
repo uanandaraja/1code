@@ -2,7 +2,6 @@ import * as Sentry from "@sentry/electron/renderer"
 import type { ChatTransport, UIMessage } from "ai"
 import { toast } from "sonner"
 import {
-  agentsLoginModalOpenAtom,
   extendedThinkingEnabledAtom,
   sessionInfoAtom,
 } from "../../../lib/atoms"
@@ -11,7 +10,6 @@ import { trpcClient } from "../../../lib/trpc"
 import {
   askUserQuestionResultsAtom,
   compactingSubChatsAtom,
-  pendingAuthRetryMessageAtom,
   pendingUserQuestionsAtom,
   selectedProviderAtom,
   selectedModelAtom,
@@ -137,12 +135,6 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
         .allSubChats.find((subChat) => subChat.id === this.config.subChatId)
         ?.mode || this.config.mode
 
-    // Stream debug logging
-    const subId = this.config.subChatId.slice(-8)
-    let chunkCount = 0
-    let lastChunkType = ""
-    console.log(`[SD] R:START sub=${subId} cwd=${this.config.cwd} projectPath=${this.config.projectPath || "(not set)"}`)
-
     return new ReadableStream({
       start: (controller) => {
         // Use OpenCode router for multi-provider support
@@ -162,11 +154,6 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           },
           {
             onData: (chunk: UIMessageChunk) => {
-              // DEBUG: Log every chunk received in renderer
-              console.log(`[SD] R:CHUNK sub=${subId} type=${chunk.type}`, chunk)
-              chunkCount++
-              lastChunkType = chunk.type
-
               // Handle AskUserQuestion - show question UI
               if (chunk.type === "ask-user-question") {
                 appStore.set(pendingUserQuestionsAtom, {
@@ -208,19 +195,32 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
               // Handle session init - store MCP servers, plugins, tools info
               if (chunk.type === "session-init") {
-                console.log("[MCP] Received session-init:", {
-                  tools: chunk.tools?.length,
-                  mcpServers: chunk.mcpServers,
-                  plugins: chunk.plugins,
-                  skills: chunk.skills?.length,
-                  // Debug: show all tools to check for MCP tools (format: mcp__servername__toolname)
-                  allTools: chunk.tools,
-                })
                 appStore.set(sessionInfoAtom, {
                   tools: chunk.tools,
                   mcpServers: chunk.mcpServers,
                   plugins: chunk.plugins,
                   skills: chunk.skills,
+                })
+              }
+
+              // Handle message metadata - save sessionId to SQLite for persistence
+              if (chunk.type === "message-metadata" && chunk.messageMetadata?.sessionId) {
+                // Save sessionId to the subChat record for future session resume
+                trpcClient.chats.updateSubChatSession.mutate({
+                  id: this.config.subChatId,
+                  sessionId: chunk.messageMetadata.sessionId,
+                }).catch(() => {
+                  // Ignore save errors - session resume is a nice-to-have
+                })
+              }
+
+              // Handle session title - update subChat name with OpenCode's auto-generated title
+              if (chunk.type === "session-title" && chunk.title) {
+                trpcClient.chats.renameSubChat.mutate({
+                  id: this.config.subChatId,
+                  name: chunk.title,
+                }).catch(() => {
+                  // Ignore save errors
                 })
               }
 
@@ -242,22 +242,11 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 }
               }
 
-              // Handle authentication errors - show Claude login modal
+              // Handle authentication errors - just show error toast
               if (chunk.type === "auth-error") {
-                // Store the failed message for retry after successful auth
-                // readyToRetry=false prevents immediate retry - modal sets it to true on OAuth success
-                appStore.set(pendingAuthRetryMessageAtom, {
-                  subChatId: this.config.subChatId,
-                  prompt,
-                  ...(images.length > 0 && { images }),
-                  readyToRetry: false,
+                toast.error("Authentication Error", {
+                  description: "Please configure your API key in OpenCode settings.",
                 })
-                // Show the Claude Code login modal
-                appStore.set(agentsLoginModalOpenAtom, true)
-                // Use controller.error() instead of controller.close() so that
-                // the SDK Chat properly resets status from "streaming" to "ready"
-                // This allows user to retry sending messages after failed auth
-                console.log(`[SD] R:AUTH_ERR sub=${subId}`)
                 controller.error(new Error("Authentication required"))
                 return
               }
@@ -308,13 +297,11 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               // Try to enqueue, but don't crash if stream is already closed
               try {
                 controller.enqueue(chunk)
-              } catch (e) {
-                // CRITICAL: Log when enqueue fails - this could explain missing chunks!
-                console.log(`[SD] R:ENQUEUE_ERR sub=${subId} type=${chunk.type} n=${chunkCount} err=${e}`)
+              } catch {
+                // Stream already closed
               }
 
               if (chunk.type === "finish") {
-                console.log(`[SD] R:FINISH sub=${subId} n=${chunkCount}`)
                 try {
                   controller.close()
                 } catch {
@@ -323,7 +310,6 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               }
             },
             onError: (err: Error) => {
-              console.log(`[SD] R:ERROR sub=${subId} n=${chunkCount} last=${lastChunkType} err=${err.message}`)
               // Track transport errors in Sentry
               Sentry.captureException(err, {
                 tags: {
@@ -340,7 +326,6 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               controller.error(err)
             },
             onComplete: () => {
-              console.log(`[SD] R:COMPLETE sub=${subId} n=${chunkCount} last=${lastChunkType}`)
               // Note: Don't clear pending questions here - let active-chat.tsx handle it
               // via the stream stop detection effect. Clearing here causes race conditions
               // where sync effect immediately restores from messages.
@@ -355,7 +340,6 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
         // Handle abort
         options.abortSignal?.addEventListener("abort", () => {
-          console.log(`[SD] R:ABORT sub=${subId} n=${chunkCount} last=${lastChunkType}`)
           sub.unsubscribe()
           trpcClient.opencode.cancel.mutate({ subChatId: this.config.subChatId })
           try {
@@ -365,14 +349,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           }
         })
       },
-      // Track when the consumer cancels the stream
-      cancel: (reason) => {
-        console.log(`[SD] R:CANCEL sub=${subId} n=${chunkCount} last=${lastChunkType} reason=${reason}`)
-      },
-      // Track when stream is pulled (consumer requests more data)
-      pull: () => {
-        // This is called when consumer wants more data - not logging every pull as it's too noisy
-        // console.log(`[SD] R:PULL sub=${subId}`)
+      cancel: () => {
+        // Stream cancelled by consumer
       },
     })
   }

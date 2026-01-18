@@ -1,9 +1,12 @@
-import type { UIMessageChunk, MessageMetadata, MCPServer } from "../claude/types"
 import type {
+  UIMessageChunk,
+  MessageMetadata,
+  MCPServer,
   Part,
   TextPart,
   ToolPart,
   ReasoningPart,
+  FilePart,
   StepStartPart,
   StepFinishPart,
   Message,
@@ -41,7 +44,7 @@ export function createOpenCodeTransformer() {
 
     switch (event.type) {
       case "server.connected":
-        console.log("[OpenCode Transform] Server connected")
+        // Server connected, no action needed
         break
 
       case "message.updated": {
@@ -122,9 +125,23 @@ export function createOpenCodeTransformer() {
         break
       }
 
+      case "session.updated": {
+        // Emit session title when OpenCode auto-generates it
+        const session = event.properties.info
+        if (session.title && !session.title.startsWith("New session - ")) {
+          yield { type: "session-title", title: session.title }
+        }
+        break
+      }
+
+      case "session.created":
+      case "session.deleted":
+        // No action needed for these events
+        break
+
       default:
-        // Log unknown events for debugging
-        console.log("[OpenCode Transform] Unknown event:", (event as any).type)
+        // Unknown event type, ignore
+        break
     }
   }
 }
@@ -281,7 +298,8 @@ function* transformPart(
     // Subtask, file, snapshot, patch, agent, retry, compaction parts
     // can be handled as needed
     default:
-      console.log("[OpenCode Transform] Unhandled part type:", part.type)
+      // Unhandled part type, ignore
+      break
   }
 }
 
@@ -298,7 +316,6 @@ function* handleSessionStatus(
       break
     case "retry":
       // Retrying with attempt number
-      console.log(`[OpenCode] Session ${sessionID} retrying, attempt ${status.attempt}`)
       break
   }
 }
@@ -363,4 +380,158 @@ function getErrorMessage(error: unknown): string {
   
   const e = error as { name?: string; data?: { message?: string } }
   return e.data?.message || e.name || "Unknown error"
+}
+
+/**
+ * UI Message format expected by the renderer
+ */
+export interface UIMessage {
+  id: string
+  role: "user" | "assistant"
+  parts: UIMessagePart[]
+  metadata?: {
+    sessionId?: string
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    cost?: number
+  }
+}
+
+export type UIMessagePart =
+  | { type: "text"; text: string }
+  | { type: "data-image"; data: { url: string; mediaType: string; filename?: string } }
+  | { type: `tool-${string}`; toolCallId: string; toolName: string; state: string; input?: unknown; output?: unknown }
+  | { type: "reasoning"; id: string; text: string }
+
+/**
+ * Transform OpenCode session messages to UI message format
+ * Used when loading persisted messages from OpenCode sessions
+ */
+export function transformSessionMessages(
+  messages: Array<{ info: Message; parts: Part[] }>
+): UIMessage[] {
+  const result: UIMessage[] = []
+
+  for (const { info, parts } of messages) {
+    const uiMessage: UIMessage = {
+      id: info.id,
+      role: info.role,
+      parts: [],
+    }
+
+    // Add metadata for assistant messages
+    if (info.role === "assistant") {
+      const assistantInfo = info as AssistantMessage
+      uiMessage.metadata = {
+        sessionId: assistantInfo.sessionID,
+        inputTokens: assistantInfo.tokens?.input,
+        outputTokens: assistantInfo.tokens?.output,
+        totalTokens: (assistantInfo.tokens?.input || 0) + (assistantInfo.tokens?.output || 0),
+        cost: assistantInfo.cost,
+      }
+    }
+
+    // Transform parts
+    for (const part of parts) {
+      const uiPart = transformPartToUIPart(part)
+      if (uiPart) {
+        uiMessage.parts.push(uiPart)
+      }
+    }
+
+    // Only add messages that have parts
+    if (uiMessage.parts.length > 0) {
+      result.push(uiMessage)
+    }
+  }
+
+  return result
+}
+
+/**
+ * Transform a single OpenCode part to UI part format
+ */
+function transformPartToUIPart(part: Part): UIMessagePart | null {
+  switch (part.type) {
+    case "text": {
+      const textPart = part as TextPart
+      if (!textPart.text) return null
+      return { type: "text", text: textPart.text }
+    }
+
+    case "reasoning": {
+      const reasoningPart = part as ReasoningPart
+      if (!reasoningPart.text) return null
+      return { type: "reasoning", id: reasoningPart.id, text: reasoningPart.text }
+    }
+
+    case "file": {
+      const filePart = part as FilePart
+      // Only handle image files for now
+      if (filePart.mime?.startsWith("image/") && filePart.url) {
+        return {
+          type: "data-image",
+          data: {
+            url: filePart.url,
+            mediaType: filePart.mime,
+            filename: filePart.filename,
+          },
+        }
+      }
+      return null
+    }
+
+    case "tool": {
+      const toolPart = part as ToolPart
+      const toolName = mapToolName(toolPart.tool)
+      const toolCallId = toolPart.callID || toolPart.id
+
+      // Map OpenCode tool state to UI state
+      let state: string
+      let output: unknown = undefined
+
+      switch (toolPart.state.status) {
+        case "pending":
+          state = "call"
+          break
+        case "running":
+          state = "call"
+          break
+        case "completed":
+          state = "output-available"
+          output = parseToolOutput(toolPart.state.output, toolPart.tool)
+          break
+        case "error":
+          state = "output-error"
+          output = { error: toolPart.state.error }
+          break
+        default:
+          state = "call"
+      }
+
+      return {
+        type: `tool-${toolName}`,
+        toolCallId,
+        toolName,
+        state,
+        input: toolPart.state.input,
+        output,
+      }
+    }
+
+    // Skip step markers and other parts that don't need to be persisted
+    case "step-start":
+    case "step-finish":
+    case "snapshot":
+    case "patch":
+    case "agent":
+    case "retry":
+    case "compaction":
+    case "subtask":
+      return null
+
+    default:
+      return null
+  }
 }

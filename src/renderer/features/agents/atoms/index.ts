@@ -455,19 +455,7 @@ export const pendingPrMessageAtom = atom<string | null>(null)
 // Set by ChatView when "Review" is clicked, consumed by ChatViewInner
 export const pendingReviewMessageAtom = atom<string | null>(null)
 
-// Pending auth retry - stores failed message when auth-error occurs
-// After successful OAuth flow, this triggers automatic retry of the message
-export type PendingAuthRetryMessage = {
-  subChatId: string  // Required: only retry in the correct chat
-  prompt: string
-  images?: Array<{
-    base64Data: string
-    mediaType: string
-    filename?: string
-  }>
-  readyToRetry: boolean  // Only retry when this is true (set by modal on OAuth success)
-}
-export const pendingAuthRetryMessageAtom = atom<PendingAuthRetryMessage | null>(null)
+
 
 // Work mode preference (local = work in project dir, worktree = create isolated worktree)
 export type WorkMode = "local" | "worktree"

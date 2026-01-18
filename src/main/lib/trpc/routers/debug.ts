@@ -1,7 +1,6 @@
 import { router, publicProcedure } from "../index"
 import { getDatabase, projects, chats, subChats } from "../../db"
 import { app, shell } from "electron"
-import { getAuthManager } from "../../../index"
 
 // Protocol constant (must match main/index.ts)
 const IS_DEV = !!process.env.ELECTRON_RENDERER_URL
@@ -74,16 +73,6 @@ export const debugRouter = router({
     db.delete(chats).run()
     db.delete(projects).run()
     console.log("[Debug] Cleared all database data")
-    return { success: true }
-  }),
-
-  /**
-   * Logout (clear auth only)
-   */
-  logout: publicProcedure.mutation(() => {
-    const authManager = getAuthManager()
-    authManager.logout()
-    console.log("[Debug] User logged out")
     return { success: true }
   }),
 

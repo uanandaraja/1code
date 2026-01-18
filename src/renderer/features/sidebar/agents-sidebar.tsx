@@ -947,32 +947,12 @@ const SidebarHeader = memo(function SidebarHeader({
               >
                 {userId ? (
                   <>
-                    {/* Project section at the top */}
-                    <div className="relative rounded-t-xl border-b overflow-hidden">
-                      <div className="absolute inset-0 bg-popover brightness-110" />
-                      <div className="relative pl-2 pt-1.5 pb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-8 h-8 rounded flex items-center justify-center bg-background flex-shrink-0 overflow-hidden">
-                            <Logo className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0 overflow-hidden">
-                            <div className="font-medium text-sm text-foreground truncate">
-                              {desktopUser?.name || "User"}
-                            </div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {desktopUser?.email}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Settings */}
                     <DropdownMenuItem
                       className="gap-2"
                       onSelect={() => {
                         setIsDropdownOpen(false)
-                        setSettingsActiveTab("profile")
+                        setSettingsActiveTab("appearance")
                         setSettingsDialogOpen(true)
                       }}
                     >
@@ -1019,66 +999,21 @@ const SidebarHeader = memo(function SidebarHeader({
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
 
-                    <DropdownMenuSeparator />
-
-                    {/* Log out */}
-                    <div className="">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onSelect={() => onSignOut()}
-                      >
-                        <svg
-                          className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <polyline
-                            points="16,17 21,12 16,7"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <line
-                            x1="21"
-                            y1="12"
-                            x2="9"
-                            y2="12"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        Log out
-                      </DropdownMenuItem>
-                    </div>
                   </>
                 ) : (
                   <>
-                    {/* Login for unauthenticated users */}
-                    <div className="">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onSelect={() => {
-                          setIsDropdownOpen(false)
-                          setShowAuthDialog(true)
-                        }}
-                      >
-                        <ProfileIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        Login
-                      </DropdownMenuItem>
-                    </div>
-
-                    <DropdownMenuSeparator />
+                    {/* Settings for unauthenticated users */}
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onSelect={() => {
+                        setIsDropdownOpen(false)
+                        setSettingsActiveTab("appearance")
+                        setSettingsDialogOpen(true)
+                      }}
+                    >
+                      <SettingsIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      Settings
+                    </DropdownMenuItem>
 
                     {/* Help Submenu */}
                     <DropdownMenuSub>
@@ -2462,7 +2397,7 @@ export function AgentsSidebar({
                     <button
                       type="button"
                       onClick={() => {
-                        setSettingsActiveTab("profile")
+                        setSettingsActiveTab("appearance")
                         setSettingsDialogOpen(true)
                       }}
                       className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/70"

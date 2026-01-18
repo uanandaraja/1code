@@ -163,8 +163,8 @@ export const clearSubChatSelectionAtom = atom(null, (_get, set) => {
 // ============================================
 
 // Settings dialog
-export type SettingsTab = "profile" | "appearance" | "preferences" | "skills" | "agents" | "mcp" | "debug"
-export const agentsSettingsDialogActiveTabAtom = atom<SettingsTab>("profile")
+export type SettingsTab = "appearance" | "preferences" | "skills" | "agents" | "mcp" | "debug"
+export const agentsSettingsDialogActiveTabAtom = atom<SettingsTab>("appearance")
 export const agentsSettingsDialogOpenAtom = atom<boolean>(false)
 
 // Preferences - Extended Thinking
@@ -292,8 +292,7 @@ export const allFullThemesAtom = atom<VSCodeFullTheme[]>((get) => {
 // Shortcuts dialog
 export const agentsShortcutsDialogOpenAtom = atom<boolean>(false)
 
-// Login modal (shown when Claude Code auth fails)
-export const agentsLoginModalOpenAtom = atom<boolean>(false)
+
 
 // Help popover
 export const agentsHelpPopoverOpenAtom = atom<boolean>(false)
@@ -357,19 +356,7 @@ export const isDesktopAtom = atom<boolean>(false)
 // null = not yet loaded, false = not fullscreen, true = fullscreen
 export const isFullscreenAtom = atom<boolean | null>(null)
 
-// ============================================
-// ANTHROPIC ONBOARDING ATOMS
-// ============================================
 
-// Whether user has completed Anthropic OAuth during onboarding
-// This is used to show the onboarding screen after 21st.dev sign-in
-// Reset on logout
-export const anthropicOnboardingCompletedAtom = atomWithStorage<boolean>(
-  "onboarding:anthropic-completed",
-  false,
-  undefined,
-  { getOnInit: true },
-)
 
 // ============================================
 // SESSION INFO ATOMS (MCP, Plugins, Tools)

@@ -90,13 +90,7 @@ export function AgentsDebugTab() {
     onError: (error) => toast.error(error.message),
   })
 
-  const logoutMutation = trpc.debug.logout.useMutation({
-    onSuccess: () => {
-      toast.success("Logged out. Reloading...")
-      setTimeout(() => window.location.reload(), 500)
-    },
-    onError: (error) => toast.error(error.message),
-  })
+
 
   const openFolderMutation = trpc.debug.openUserDataFolder.useMutation({
     onError: (error) => toast.error(error.message),
@@ -326,18 +320,6 @@ export function AgentsDebugTab() {
             disabled={clearChatsMutation.isPending}
           >
             {clearChatsMutation.isPending ? "..." : "Clear Chats"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (confirm("Logout? You will need to sign in again.")) {
-                logoutMutation.mutate()
-              }
-            }}
-            disabled={logoutMutation.isPending}
-          >
-            {logoutMutation.isPending ? "..." : "Logout"}
           </Button>
           <Button
             variant="destructive"

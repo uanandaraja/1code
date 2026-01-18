@@ -1,8 +1,7 @@
 import { z } from "zod"
 import { observable } from "@trpc/server/observable"
 import { router, publicProcedure } from "../index"
-import { serverManager, createOpenCodeTransformer, type OpenCodeEvent } from "../../opencode"
-import type { UIMessageChunk } from "../../claude/types"
+import { serverManager, createOpenCodeTransformer, transformSessionMessages, type OpenCodeEvent, type UIMessageChunk } from "../../opencode"
 
 // Track active sessions for cancellation
 const activeSessions = new Map<string, { abort: () => void; sessionId: string | null }>()
@@ -50,16 +49,6 @@ export const opencodeRouter = router({
 
         const run = async () => {
           try {
-            console.log("[OpenCode Router] Starting chat:", {
-              subChatId: input.subChatId,
-              prompt: input.prompt.slice(0, 50) + "...",
-              cwd: input.cwd,
-              mode: input.mode,
-              provider: input.provider,
-              model: input.model,
-              sessionId: input.sessionId,
-            })
-
             const client = serverManager.getClient()
             if (!client) {
               emit.next({ type: "error", errorText: "OpenCode server not running. Please restart the app." })
@@ -78,13 +67,7 @@ export const opencodeRouter = router({
                   // Filter events for our session
                   const e = event as OpenCodeEvent
                   
-                  // Debug: log all events
-                  console.log("[OpenCode Router] SSE event:", e.type, 
-                    "sessionId:", getSessionIdFromEvent(e), 
-                    "currentSessionId:", currentSessionId)
-                  
                   if (e.type === "server.connected") {
-                    console.log("[OpenCode Router] Connected to SSE")
                     return
                   }
                   
@@ -96,37 +79,22 @@ export const opencodeRouter = router({
                   // Only process events for our session (if we have a session)
                   const eventSessionId = getSessionIdFromEvent(e)
                   if (eventSessionId && currentSessionId && eventSessionId !== currentSessionId) {
-                    console.log("[OpenCode Router] Skipping event for different session")
                     return // Not our session
                   }
 
                   // Transform and emit
-                  let chunkCount = 0
                   for (const chunk of transform(e)) {
-                    chunkCount++
-                    console.log("[OpenCode Router] Emitting chunk:", chunk.type, JSON.stringify(chunk).slice(0, 200))
                     try {
                       emit.next(chunk)
-                      console.log("[OpenCode Router] emit.next succeeded for:", chunk.type)
                     } catch (emitErr) {
-                      console.error("[OpenCode Router] emit.next FAILED:", emitErr)
+                      console.error("[OpenCode] emit.next failed:", emitErr)
                     }
-                  }
-                  if (chunkCount === 0) {
-                    console.log("[OpenCode Router] No chunks generated for event:", e.type)
                   }
 
                   // Check for completion - session.idle means we're done
-                  // The transform already emits 'finish' chunk on session.idle
-                  // We need to complete AFTER the finish chunk is delivered
                   if (e.type === "session.idle") {
-                    console.log("[OpenCode Router] Session idle, cleaning up")
                     activeSessions.delete(input.subChatId)
                     eventUnsubscribe?.()
-                    // Don't call emit.complete() here - let the renderer close
-                    // the stream when it receives the 'finish' chunk.
-                    // Calling complete() immediately can cause a race where the
-                    // stream closes before all chunks are delivered via IPC.
                   }
                 },
                 (error) => {
@@ -137,22 +105,26 @@ export const opencodeRouter = router({
               eventUnsubscribe = subscription.unsubscribe
               
               // Wait for SSE connection to be established before proceeding
-              console.log("[OpenCode Router] Waiting for SSE connection...")
               await subscription.connected
-              console.log("[OpenCode Router] SSE connection ready, proceeding with session")
             }
 
             // Create or resume session
             let sessionId = input.sessionId
             if (!sessionId) {
-              console.log("[OpenCode Router] Creating new session for directory:", input.cwd)
               const result = await client.session.create({
                 query: { directory: input.cwd },
                 body: {},
               })
               sessionId = result.data?.id
               currentSessionId = sessionId || null
-              console.log("[OpenCode Router] Session created:", sessionId, "in directory:", input.cwd)
+
+              // Emit session ID immediately so the renderer can save it
+              if (sessionId) {
+                emit.next({
+                  type: "message-metadata",
+                  messageMetadata: { sessionId },
+                })
+              }
 
               // Update the stored session info
               if (sessionId) {
@@ -161,12 +133,9 @@ export const opencodeRouter = router({
                   sessionId,
                 })
               }
-            } else {
-              console.log("[OpenCode Router] Resuming session:", sessionId)
             }
 
             if (!sessionId) {
-              console.error("[OpenCode Router] Failed to create session")
               emit.next({ type: "error", errorText: "Failed to create session" })
               emit.complete()
               return
@@ -189,19 +158,10 @@ export const opencodeRouter = router({
             }
 
             // Determine agent mode
-            // OpenCode uses "build" for agent mode, and has a "plan" agent too
             const agent = input.mode === "plan" ? "plan" : undefined
 
             // Send prompt (async - response comes via SSE)
-            console.log("[OpenCode Router] Sending prompt to session:", sessionId, {
-              partsCount: parts.length,
-              agent,
-              model: input.provider && input.model
-                ? { providerID: input.provider, modelID: input.model }
-                : "default",
-            })
-            
-            const promptResult = await client.session.promptAsync({
+            await client.session.promptAsync({
               query: { directory: input.cwd },
               path: { id: sessionId },
               body: {
@@ -212,9 +172,8 @@ export const opencodeRouter = router({
                   : undefined,
               },
             })
-            console.log("[OpenCode Router] Prompt sent, result:", promptResult)
           } catch (error) {
-            console.error("[OpenCode Router] Error:", error)
+            console.error("[OpenCode] Error:", error)
             emit.next({
               type: "error",
               errorText: error instanceof Error ? error.message : "Unknown error",
@@ -249,8 +208,8 @@ export const opencodeRouter = router({
         if (client && session.sessionId) {
           try {
             await client.session.abort({ path: { id: session.sessionId } })
-          } catch (e) {
-            console.error("[OpenCode Router] Failed to abort session:", e)
+          } catch {
+            // Ignore abort errors
           }
         }
 
@@ -317,8 +276,7 @@ export const opencodeRouter = router({
         defaults,
         connected: connectedIds,
       }
-    } catch (e) {
-      console.error("[OpenCode Router] Failed to get providers:", e)
+    } catch {
       return { providers: [], defaults: {}, connected: [] }
     }
   }),
@@ -344,8 +302,7 @@ export const opencodeRouter = router({
       try {
         const result = await client.session.list()
         return result.data || []
-      } catch (e) {
-        console.error("[OpenCode Router] Failed to list sessions:", e)
+      } catch {
         return []
       }
     }),
@@ -370,7 +327,6 @@ export const opencodeRouter = router({
         }))
         return { mcpServers, projectPath: input.projectPath }
       } catch (e) {
-        console.error("[OpenCode Router] Failed to get MCP status:", e)
         return { mcpServers: [], projectPath: input.projectPath, error: String(e) }
       }
     }),
@@ -395,12 +351,39 @@ export const opencodeRouter = router({
         throw new Error("OpenCode server not running")
       }
 
-      // Find the session that has this permission
-      // For now, we'll need to pass session ID separately or store it
-      // This is a simplified implementation
-      console.log("[OpenCode Router] Tool approval:", input)
-
+      // TODO: Implement tool approval via OpenCode's permission system
       return { ok: true }
+    }),
+
+  /**
+   * Get messages for a session
+   * Used to load persisted messages from OpenCode instead of SQLite
+   */
+  getSessionMessages: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        directory: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const client = serverManager.getClient()
+      if (!client) {
+        return { messages: [], sessionId: input.sessionId }
+      }
+
+      try {
+        const result = await client.session.messages({
+          path: { id: input.sessionId },
+          query: { directory: input.directory },
+        })
+
+        const messages = transformSessionMessages(result.data || [])
+        return { messages, sessionId: input.sessionId }
+      } catch {
+        // Session may not exist or have no messages yet
+        return { messages: [], sessionId: input.sessionId }
+      }
     }),
 })
 

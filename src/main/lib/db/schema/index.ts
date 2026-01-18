@@ -87,17 +87,6 @@ export const subChatsRelations = relations(subChats, ({ one }) => ({
   }),
 }))
 
-// ============ CLAUDE CODE CREDENTIALS ============
-// Stores encrypted OAuth token for Claude Code integration
-export const claudeCodeCredentials = sqliteTable("claude_code_credentials", {
-  id: text("id").primaryKey().default("default"), // Single row, always "default"
-  oauthToken: text("oauth_token").notNull(), // Encrypted with safeStorage
-  connectedAt: integer("connected_at", { mode: "timestamp" }).$defaultFn(
-    () => new Date(),
-  ),
-  userId: text("user_id"), // Desktop auth user ID (for reference)
-})
-
 // ============ TYPE EXPORTS ============
 export type Project = typeof projects.$inferSelect
 export type NewProject = typeof projects.$inferInsert
@@ -105,5 +94,3 @@ export type Chat = typeof chats.$inferSelect
 export type NewChat = typeof chats.$inferInsert
 export type SubChat = typeof subChats.$inferSelect
 export type NewSubChat = typeof subChats.$inferInsert
-export type ClaudeCodeCredential = typeof claudeCodeCredentials.$inferSelect
-export type NewClaudeCodeCredential = typeof claudeCodeCredentials.$inferInsert
