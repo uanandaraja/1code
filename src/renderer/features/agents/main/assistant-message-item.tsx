@@ -202,7 +202,35 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
   subChatId,
   sandboxSetupStatus = "ready",
 }: AssistantMessageItemProps) {
-  const messageParts = message?.parts || []
+  const rawParts = message?.parts || []
+
+  // OpenCode includes the user's prompt as the first text part before any tools during streaming.
+  // We need to skip it since it's already rendered in the user bubble.
+  // BUT: only do this if the message actually has tools - if it's a text-only response, keep the text.
+  const messageParts = useMemo(() => {
+    // Check if this message has any tools
+    const hasTools = rawParts.some((part: any) => part.type?.startsWith("tool-"))
+    
+    // If no tools, don't filter anything - keep all text parts
+    if (!hasTools) {
+      return rawParts
+    }
+    
+    // Filter out the first text part that appears before any tool (user's echoed prompt)
+    let foundTool = false
+    let skippedUserText = false
+    return rawParts.filter((part: any) => {
+      if (part.type?.startsWith("tool-")) {
+        foundTool = true
+      }
+      // Skip the first text part that appears before any tool (user's echoed prompt)
+      if (part.type === "text" && !foundTool && !skippedUserText) {
+        skippedUserText = true
+        return false
+      }
+      return true
+    })
+  }, [rawParts])
 
   const contentParts = useMemo(() =>
     messageParts.filter((p: any) => p.type !== "step-start"),
@@ -367,12 +395,13 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
     if (part.type === "tool-PlanWrite") return <AgentPlanTool key={idx} part={part} chatStatus={status} />
 
     if (part.type === "tool-ExitPlanMode") {
+      const meta = AgentToolRegistry["tool-ExitPlanMode"]
       const { isPending, isError } = getToolStatus(part, status)
       return (
         <AgentToolCall
           key={idx}
-          icon={AgentToolRegistry["tool-ExitPlanMode"].icon}
-          title={AgentToolRegistry["tool-ExitPlanMode"].title(part)}
+          icon={meta.icon}
+          title={meta.title(part)}
           isPending={isPending}
           isError={isError}
         />

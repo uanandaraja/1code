@@ -308,6 +308,7 @@ const AgentChatItem = React.memo(function AgentChatItem({
   chatBranch,
   chatUpdatedAt,
   chatProjectId,
+  projectName,
   globalIndex,
   isSelected,
   isLoading,
@@ -352,6 +353,7 @@ const AgentChatItem = React.memo(function AgentChatItem({
   chatBranch: string | null
   chatUpdatedAt: Date | null
   chatProjectId: string
+  projectName: string
   globalIndex: number
   isSelected: boolean
   isLoading: boolean
@@ -463,13 +465,9 @@ const AgentChatItem = React.memo(function AgentChatItem({
                   ref={(el) => nameRefCallback(chatId, el)}
                   className="truncate block text-sm leading-tight flex-1"
                 >
-                  <TypewriterText
-                    text={chatName || ""}
-                    placeholder="New workspace"
-                    id={chatId}
-                    isJustCreated={justCreatedIds.has(chatId)}
-                    showPlaceholder={true}
-                  />
+                  {/* Heading: Project/repo name */}
+                  {projectName}
+                  {displayText && <span className="text-muted-foreground/60"> • {displayText}</span>}
                 </span>
                 {/* Hide archive button on mobile - use context menu instead */}
                 {!isMultiSelectMode && !isMobileFullscreen && (
@@ -487,7 +485,16 @@ const AgentChatItem = React.memo(function AgentChatItem({
                 )}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 min-w-0">
-                <span className="truncate flex-1 min-w-0">{displayText}</span>
+                {/* Secondary: Workspace name (initial prompt) + time */}
+                <span className="truncate flex-1 min-w-0">
+                  <TypewriterText
+                    text={chatName || ""}
+                    placeholder="New workspace"
+                    id={chatId}
+                    isJustCreated={justCreatedIds.has(chatId)}
+                    showPlaceholder={true}
+                  />
+                </span>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {stats && (stats.additions > 0 || stats.deletions > 0) && (
                     <>
@@ -669,12 +676,9 @@ const ChatListSection = React.memo(function ChatListSection({
           const globalIndex = filteredChats.findIndex((c) => c.id === chat.id)
           const isFocused = focusedChatIndex === globalIndex && focusedChatIndex >= 0
           const project = projectsMap.get(chat.projectId)
-          const repoName = project?.gitRepo || project?.name
-          const displayText = chat.branch
-            ? repoName
-              ? `${repoName} • ${chat.branch}`
-              : chat.branch
-            : repoName || "Local project"
+          const repoName = project?.gitRepo || project?.name || "Local project"
+          // displayText now shows branch info if available
+          const displayText = chat.branch || ""
           const isChecked = selectedChatIds.has(chat.id)
           const stats = workspaceFileStats.get(chat.id)
           const hasPendingPlan = workspacePendingPlans.has(chat.id)
@@ -688,6 +692,7 @@ const ChatListSection = React.memo(function ChatListSection({
               chatBranch={chat.branch}
               chatUpdatedAt={chat.updatedAt}
               chatProjectId={chat.projectId}
+              projectName={repoName}
               globalIndex={globalIndex}
               isSelected={isSelected}
               isLoading={isLoading}
@@ -1684,8 +1689,7 @@ export function AgentsSidebar({
   // Convert file stats from DB to a Map for easy lookup
   const workspaceFileStats = useMemo(() => {
     const statsMap = new Map<string, { fileCount: number; additions: number; deletions: number }>()
-    if (fileStatsData) {
-      
+    if (fileStatsData && Array.isArray(fileStatsData)) {
       for (const stat of fileStatsData) {
         statsMap.set(stat.chatId, {
           fileCount: stat.fileCount,

@@ -380,8 +380,8 @@ export const opencodeRouter = router({
 
         const messages = transformSessionMessages(result.data || [])
         return { messages, sessionId: input.sessionId }
-      } catch {
-        // Session may not exist or have no messages yet
+      } catch (error) {
+        console.error("[OpenCode] Failed to load session messages:", error)
         return { messages: [], sessionId: input.sessionId }
       }
     }),

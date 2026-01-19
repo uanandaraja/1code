@@ -20,7 +20,6 @@ export const createStatusRouter = () => {
 				}),
 			)
 			.query(async ({ input }): Promise<GitChangesStatus> => {
-				console.log("[getStatus] Called with worktreePath:", input.worktreePath);
 				assertRegisteredWorktree(input.worktreePath);
 
 				const git = simpleGit(input.worktreePath);
@@ -42,7 +41,7 @@ export const createStatusRouter = () => {
 
 				await applyUntrackedLineCount(input.worktreePath, parsed.untracked);
 
-				const result = {
+				return {
 					branch: parsed.branch,
 					defaultBranch,
 					againstBase: branchComparison.againstBase,
@@ -56,14 +55,6 @@ export const createStatusRouter = () => {
 					pullCount: trackingStatus.pullCount,
 					hasUpstream: trackingStatus.hasUpstream,
 				};
-				console.log("[getStatus] Returning:", {
-					branch: result.branch,
-					stagedCount: result.staged.length,
-					unstagedCount: result.unstaged.length,
-					untrackedCount: result.untracked.length,
-					commitsCount: result.commits.length,
-				});
-				return result;
 			}),
 
 		getCommitFiles: publicProcedure

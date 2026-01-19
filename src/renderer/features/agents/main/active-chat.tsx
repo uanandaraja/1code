@@ -49,7 +49,6 @@ import {
 // e2b API routes are used instead of useSandboxManager for agents
 // import { clearSubChatSelectionAtom, isSubChatMultiSelectModeAtom, selectedSubChatIdsAtom } from "@/lib/atoms/agent-subchat-selection"
 import { Chat, useChat } from "@ai-sdk/react"
-import { DiffModeEnum } from "@git-diff-view/react"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
   ChevronDown,
@@ -145,6 +144,7 @@ import { AgentContextIndicator } from "../ui/agent-context-indicator"
 import {
   AgentDiffView,
   diffViewModeAtom,
+  DiffModeEnum,
   splitUnifiedDiffByFile,
   type AgentDiffViewRef,
 } from "../ui/agent-diff-view"
@@ -2839,15 +2839,24 @@ export function ChatView({
         return null
       }
 
-      // Return existing chat if we have it
-      const existing = agentChatStore.get(subChatId)
-      if (existing) {
-        return existing
-      }
-
       // Find sub-chat data
       const subChat = agentSubChats.find((sc) => sc.id === subChatId)
       const messages = (subChat?.messages as any[]) || []
+
+      // Return existing chat if we have it AND it has messages OR the new data has no messages
+      // This ensures we recreate the chat when OpenCode loads historical messages
+      const existing = agentChatStore.get(subChatId)
+      if (existing) {
+        const existingMessageCount = existing.messages?.length || 0
+        const newMessageCount = messages.length
+        
+        // If existing chat is empty but new data has messages, recreate it
+        if (existingMessageCount === 0 && newMessageCount > 0) {
+          agentChatStore.delete(subChatId)
+        } else {
+          return existing
+        }
+      }
 
       // Get mode from store metadata (falls back to current isPlanMode)
       const subChatMeta = useAgentSubChatStore

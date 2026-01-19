@@ -168,7 +168,6 @@ export const chatsRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      console.log("[chats.create] called with:", input)
       const db = getDatabase()
 
       // Get project path
@@ -177,7 +176,6 @@ export const chatsRouter = router({
         .from(projects)
         .where(eq(projects.id, input.projectId))
         .get()
-      console.log("[chats.create] found project:", project)
       if (!project) throw new Error("Project not found")
 
       // Create chat (fast path)
@@ -186,7 +184,6 @@ export const chatsRouter = router({
         .values({ name: input.name, projectId: input.projectId })
         .returning()
         .get()
-      console.log("[chats.create] created chat:", chat)
 
       // Create initial sub-chat with user message (AI SDK format)
       // If initialMessageParts is provided, use it; otherwise fallback to text-only message
@@ -219,7 +216,6 @@ export const chatsRouter = router({
         })
         .returning()
         .get()
-      console.log("[chats.create] created subChat:", subChat)
 
       // Worktree creation result (will be set if useWorktree is true)
       let worktreeResult: {
@@ -230,17 +226,12 @@ export const chatsRouter = router({
 
       // Only create worktree if useWorktree is true
       if (input.useWorktree) {
-        console.log(
-          "[chats.create] creating worktree with baseBranch:",
-          input.baseBranch,
-        )
         const result = await createWorktreeForChat(
           project.path,
           project.id,
           chat.id,
           input.baseBranch,
         )
-        console.log("[chats.create] worktree result:", result)
 
         if (result.success && result.worktreePath) {
           db.update(chats)
@@ -267,7 +258,6 @@ export const chatsRouter = router({
         }
       } else {
         // Local mode: use project path directly, no branch info
-        console.log("[chats.create] local mode - using project path directly")
         db.update(chats)
           .set({ worktreePath: project.path })
           .where(eq(chats.id, chat.id))
@@ -290,7 +280,6 @@ export const chatsRouter = router({
         useWorktree: input.useWorktree,
       })
 
-      console.log("[chats.create] returning:", response)
       return response
     }),
 

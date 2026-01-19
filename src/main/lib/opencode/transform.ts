@@ -29,6 +29,10 @@ export function createOpenCodeTransformer() {
   
   // Track reasoning parts that have been started (need tool-input-start before tool-input-delta)
   const reasoningPartStarted = new Set<string>()
+  
+  // Track the current assistant message ID - we only want to process parts from assistant messages
+  // User message parts also come through message.part.updated but should be ignored
+  let currentAssistantMessageId: string | null = null
 
   // Generate unique IDs
   const genId = () => `oc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -51,6 +55,9 @@ export function createOpenCodeTransformer() {
         const message = event.properties.info
         if (message.role === "assistant") {
           const assistantMsg = message as AssistantMessage
+          // Track this as the current assistant message
+          currentAssistantMessageId = assistantMsg.id
+          
           // Handle message completion
           if (assistantMsg.time.completed) {
             const metadata: MessageMetadata = {
@@ -79,6 +86,15 @@ export function createOpenCodeTransformer() {
 
       case "message.part.updated": {
         const { part, delta } = event.properties
+        const partMessageId = (part as any).messageID
+        
+        // Skip parts that don't belong to the current assistant message
+        // This filters out user message parts that OpenCode also sends
+        if (partMessageId && currentAssistantMessageId && partMessageId !== currentAssistantMessageId) {
+          // This part belongs to a different message (likely user message), skip it
+          break
+        }
+        
         yield* transformPart(part, delta, textPartStates, reasoningPartStarted, genId)
         break
       }

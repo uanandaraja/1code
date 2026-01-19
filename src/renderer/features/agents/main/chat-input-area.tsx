@@ -727,7 +727,7 @@ export const ChatInputArea = memo(function ChatInputArea({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-[280px] max-h-[400px] overflow-y-auto">
-                      {providersData?.providers.map((provider) => {
+                      {(providersData?.providers ?? []).map((provider) => {
                         const modelEntries = Object.entries(provider.models || {})
                         if (modelEntries.length === 0) return null
                         

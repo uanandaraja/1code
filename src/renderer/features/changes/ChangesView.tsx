@@ -37,20 +37,14 @@ export function ChangesView({
 	onFileOpen,
 	onFileOpenPinned,
 }: ChangesViewProps) {
-	// Debug: Log worktreePath on mount and changes
-	console.log("[ChangesView] Mounted with worktreePath:", worktreePath);
-
 	// Listen for file changes from Claude Write/Edit tools
 	useFileChangeListener(worktreePath);
 
 	const { baseBranch } = useChangesStore();
-	const { data: branchData, error: branchError } = trpc.changes.getBranches.useQuery(
+	const { data: branchData } = trpc.changes.getBranches.useQuery(
 		{ worktreePath: worktreePath || "" },
 		{ enabled: !!worktreePath },
 	);
-
-	// Debug: Log branch data
-	console.log("[ChangesView] branchData:", branchData, "branchError:", branchError);
 
 	const effectiveBaseBranch = baseBranch ?? branchData?.defaultBranch ?? "main";
 
@@ -69,9 +63,6 @@ export function ChangesView({
 			placeholderData: (prev) => prev,
 		},
 	);
-
-	// Debug: Log status data
-	console.log("[ChangesView] status:", status, "isLoading:", isLoading, "statusError:", statusError);
 
 	const { pr, refetch: refetchPRStatus } = usePRStatus({
 		worktreePath,

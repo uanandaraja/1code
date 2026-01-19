@@ -136,31 +136,36 @@ export const api = {
             result.data.worktreePath ?? undefined,
             result.data.project?.path
           )
-            .then(setOpenCodeMessages)
+            .then((messages) => {
+              setOpenCodeMessages(messages)
+            })
             .finally(() => setIsLoadingOpenCode(false))
         }, [result.data?.subChats, result.data?.worktreePath, result.data?.project?.path])
 
         // Memoize transformation to prevent infinite re-renders
         const transformedData = useMemo(() => {
           if (!result.data) return null
+          
+          const mapped = result.data.subChats?.map((sc: AnyObj) => {
+            // Prefer messages from OpenCode if available, fall back to SQLite
+            const messages = openCodeMessages.get(sc.id) || parseMessagesFromSQLite(sc.messages)
+            
+            return {
+              ...sc,
+              created_at: sc.createdAt,
+              updated_at: sc.updatedAt,
+              messages,
+              stream_id: null,
+            }
+          })
+          
           return {
             ...result.data,
             // Desktop uses worktrees, not sandboxes
             sandbox_id: null,
             meta: null,
             // Map subChats to expected format
-            subChats: result.data.subChats?.map((sc: AnyObj) => {
-              // Prefer messages from OpenCode if available, fall back to SQLite
-              const messages = openCodeMessages.get(sc.id) || parseMessagesFromSQLite(sc.messages)
-              
-              return {
-                ...sc,
-                created_at: sc.createdAt,
-                updated_at: sc.updatedAt,
-                messages,
-                stream_id: null,
-              }
-            }),
+            subChats: mapped,
           }
         }, [result.data, openCodeMessages])
 

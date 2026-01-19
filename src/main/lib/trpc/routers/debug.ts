@@ -59,7 +59,6 @@ export const debugRouter = router({
     // Delete sub_chats first (foreign key constraint)
     db.delete(subChats).run()
     db.delete(chats).run()
-    console.log("[Debug] Cleared all chats and sub-chats")
     return { success: true }
   }),
 
@@ -72,7 +71,6 @@ export const debugRouter = router({
     db.delete(subChats).run()
     db.delete(chats).run()
     db.delete(projects).run()
-    console.log("[Debug] Cleared all database data")
     return { success: true }
   }),
 
@@ -82,7 +80,6 @@ export const debugRouter = router({
   openUserDataFolder: publicProcedure.mutation(() => {
     const userDataPath = app.getPath("userData")
     shell.openPath(userDataPath)
-    console.log("[Debug] Opened userData folder:", userDataPath)
     return { success: true }
   }),
 })

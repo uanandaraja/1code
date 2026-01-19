@@ -29,8 +29,7 @@ export function AgentsHelpPopover({
       icon: KeyboardIcon,
       label: "Shortcuts",
       onClick: () => {
-        // Open shortcuts dialog
-        console.log("Open shortcuts dialog")
+        // TODO: Open shortcuts dialog
       },
     },
     {

@@ -236,16 +236,9 @@ export const filesRouter = router({
 
         // Get entry list (cached or fresh scan)
         const entries = await getEntryList(projectPath)
-        
-        // Debug: log folder count
-        const folderCount = entries.filter(e => e.type === "folder").length
-        const fileCount = entries.filter(e => e.type === "file").length
-        console.log(`[files] Scanned ${projectPath}: ${folderCount} folders, ${fileCount} files`)
 
         // Filter and sort by query
-        const results = filterEntries(entries, query, limit)
-        console.log(`[files] Query "${query}": returning ${results.length} results, folders: ${results.filter(r => r.type === "folder").length}`)
-        return results
+        return filterEntries(entries, query, limit)
       } catch (error) {
         console.error(`[files] Error searching files:`, error)
         return []

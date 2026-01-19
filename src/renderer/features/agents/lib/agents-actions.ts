@@ -70,10 +70,7 @@ const createNewAgentAction: AgentActionDefinition = {
   category: "general",
   hotkey: "cmd+n",
   handler: async (context) => {
-    console.log("[Action] create-new-agent handler called")
-    console.log("[Action] setSelectedChatId exists:", !!context.setSelectedChatId)
     if (context.setSelectedChatId) {
-      console.log("[Action] Calling setSelectedChatId(null)")
       context.setSelectedChatId(null)
     }
     return { success: true }

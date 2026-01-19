@@ -261,7 +261,15 @@ export function NewChatForm({
 
   // Fetch repos from team
   // Desktop: no remote repos, we use local projects
-  const reposData = { repositories: [] }
+  // Type the empty array to avoid 'never[]' inference issues
+  type RemoteRepo = {
+    id: string
+    name: string
+    full_name: string
+    sandbox_status?: "not_setup" | "in_progress" | "ready" | "error"
+    pushed_at?: string
+  }
+  const reposData = { repositories: [] as RemoteRepo[] }
   const isLoadingRepos = false
 
   // Memoize repos arrays to prevent useEffect from running on every keystroke
@@ -556,7 +564,7 @@ export function NewChatForm({
       if (data.subChats?.[0]?.id) {
         ids.push(data.subChats[0].id)
       }
-      setJustCreatedIds((prev) => new Set([...prev, ...ids]))
+      setJustCreatedIds((prev: Set<string>) => new Set([...prev, ...ids]))
     },
     onError: (error) => {
       toast.error(error.message)
@@ -1205,7 +1213,7 @@ export function NewChatForm({
                           align="start"
                           className="w-[280px] max-h-[400px] overflow-y-auto"
                         >
-                          {providersData?.providers.map((provider) => {
+                          {(providersData?.providers ?? []).map((provider) => {
                             const modelEntries = Object.entries(provider.models || {})
                             if (modelEntries.length === 0) return null
                             

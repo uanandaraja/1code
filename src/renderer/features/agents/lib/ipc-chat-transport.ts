@@ -216,6 +216,12 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
               // Handle session title - update subChat name with OpenCode's auto-generated title
               if (chunk.type === "session-title" && chunk.title) {
+                // Update Zustand store immediately for real-time UI update
+                useAgentSubChatStore.getState().updateSubChatName(
+                  this.config.subChatId,
+                  chunk.title
+                )
+                // Also persist to database
                 trpcClient.chats.renameSubChat.mutate({
                   id: this.config.subChatId,
                   name: chunk.title,

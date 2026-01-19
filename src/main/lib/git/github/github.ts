@@ -82,8 +82,6 @@ async function getRepoUrl(worktreePath: string): Promise<string | null> {
 		const raw = JSON.parse(stdout);
 		const result = GHRepoResponseSchema.safeParse(raw);
 		if (!result.success) {
-			console.error("[GitHub] Repo schema validation failed:", result.error);
-			console.error("[GitHub] Raw data:", JSON.stringify(raw, null, 2));
 			return null;
 		}
 		return result.data.url;
@@ -112,8 +110,6 @@ async function getPRForBranch(
 		const raw = JSON.parse(stdout);
 		const result = GHPRResponseSchema.safeParse(raw);
 		if (!result.success) {
-			console.error("[GitHub] PR schema validation failed:", result.error);
-			console.error("[GitHub] Raw data:", JSON.stringify(raw, null, 2));
 			throw new Error("PR schema validation failed");
 		}
 		const data = result.data;

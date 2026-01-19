@@ -123,7 +123,6 @@ export function useAgentsHotkeys(
     if (!window.desktopApi?.onShortcutNewAgent) return
 
     const cleanup = window.desktopApi.onShortcutNewAgent(() => {
-      console.log("[Hotkey] Cmd+N received via IPC, executing create-new-agent")
       handleHotkeyAction("create-new-agent")
     })
 

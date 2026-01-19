@@ -194,7 +194,6 @@ export function createMainWindow(): BrowserWindow {
 
   // Show window when ready
   window.on("ready-to-show", () => {
-    console.log("[Main] Window ready to show")
     // Ensure native traffic lights are visible by default
     if (process.platform === "darwin") {
       window.setWindowButtonVisibility(true)
@@ -240,7 +239,6 @@ export function createMainWindow(): BrowserWindow {
   // Load the renderer - always load main app directly (no auth check)
   const devServerUrl = process.env.ELECTRON_RENDERER_URL
 
-  console.log("[Main] Loading app...")
   if (devServerUrl) {
     window.loadURL(devServerUrl)
     window.webContents.openDevTools()
@@ -250,7 +248,6 @@ export function createMainWindow(): BrowserWindow {
 
   // Ensure traffic lights are visible after page load (covers reload/Cmd+R case)
   window.webContents.on("did-finish-load", () => {
-    console.log("[Main] Page finished loading")
     if (process.platform === "darwin") {
       window.setWindowButtonVisibility(true)
     }

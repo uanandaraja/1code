@@ -243,14 +243,11 @@ body:has([data-agents-page]) .canvas-dialog,
 }
 
 /* ========================================
-   9. GIT DIFF VIEW STYLES
+   9. GIT DIFF VIEW STYLES (@pierre/diffs)
    ======================================== */
 
-/* Git Diff View Customization - compact 12px font size for diffs */
+/* Pierre Diffs wrapper - compact 12px font size for diffs */
 .agent-diff-wrapper {
-  /* Set CSS variables that @git-diff-view/react uses */
-  --diff-font-size--: 12px;
-  --diff-line-height--: 1.5;
   font-size: 12px;
   line-height: 1.5;
   width: 100%;
@@ -258,18 +255,9 @@ body:has([data-agents-page]) .canvas-dialog,
   overflow-y: hidden;
 }
 
-/* Specific elements that need consistent styling */
-.agent-diff-wrapper .diff-line-content-item,
-.agent-diff-wrapper .diff-line-syntax-raw,
-.agent-diff-wrapper .unified-diff-table,
-.agent-diff-wrapper .diff-line-num {
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* Monospace font for code elements */
-.agent-diff-wrapper code,
-.agent-diff-wrapper pre {
-  font-size: 12px;
+/* Pierre Diffs custom element styling */
+.agent-diff-wrapper pierre-diffs {
+  --font-size: 12px;
+  --line-height: 1.5;
   font-family: "Monaco", "Menlo", "Consolas", monospace;
 }

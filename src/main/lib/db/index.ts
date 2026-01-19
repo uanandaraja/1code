@@ -46,7 +46,6 @@ export function initDatabase() {
   }
 
   const dbPath = getDatabasePath()
-  console.log(`[DB] Initializing database at: ${dbPath}`)
 
   // Create SQLite connection
   sqlite = new Database(dbPath)
@@ -58,11 +57,9 @@ export function initDatabase() {
 
   // Run migrations
   const migrationsPath = getMigrationsPath()
-  console.log(`[DB] Running migrations from: ${migrationsPath}`)
 
   try {
     migrate(db, { migrationsFolder: migrationsPath })
-    console.log("[DB] Migrations completed")
   } catch (error) {
     console.error("[DB] Migration error:", error)
     throw error
@@ -89,7 +86,6 @@ export function closeDatabase(): void {
     sqlite.close()
     sqlite = null
     db = null
-    console.log("[DB] Database connection closed")
   }
 }
 

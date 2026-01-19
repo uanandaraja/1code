@@ -67,11 +67,6 @@ export function getAppUrl(): string {
 }
 
 // Register protocol BEFORE app is ready
-console.log("[Protocol] ========== PROTOCOL REGISTRATION ==========")
-console.log("[Protocol] Protocol:", PROTOCOL)
-console.log("[Protocol] Is dev mode (process.defaultApp):", process.defaultApp)
-console.log("[Protocol] process.execPath:", process.execPath)
-console.log("[Protocol] process.argv:", process.argv)
 
 /**
  * Register the app as the handler for our custom protocol.
@@ -87,20 +82,10 @@ function registerProtocol(): boolean {
       success = app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [
         process.argv[1]!,
       ])
-      console.log(
-        `[Protocol] Dev mode registration:`,
-        success ? "success" : "failed",
-      )
-    } else {
-      console.warn("[Protocol] Dev mode: insufficient argv for registration")
     }
   } else {
     // Production mode
     success = app.setAsDefaultProtocolClient(PROTOCOL)
-    console.log(
-      `[Protocol] Production registration:`,
-      success ? "success" : "failed",
-    )
   }
 
   return success
@@ -111,26 +96,8 @@ let initialRegistration = false
 
 // Verify registration (this checks if OS recognizes us as the handler)
 function verifyProtocolRegistration(): void {
-  const isDefault = process.defaultApp
-    ? app.isDefaultProtocolClient(PROTOCOL, process.execPath, [
-        process.argv[1]!,
-      ])
-    : app.isDefaultProtocolClient(PROTOCOL)
-
-  console.log(`[Protocol] Verification - isDefaultProtocolClient: ${isDefault}`)
-
-  if (!isDefault && initialRegistration) {
-    console.warn(
-      "[Protocol] Registration returned success but verification failed.",
-    )
-    console.warn(
-      "[Protocol] This is common on first install - macOS Launch Services may need time to update.",
-    )
-    console.warn("[Protocol] The protocol should work after app restart.")
-  }
+  // Verification is done silently - registration issues will be apparent if deep links don't work
 }
-
-console.log("[Protocol] =============================================")
 
 // Clean up stale lock files from crashed instances
 // Returns true if locks were cleaned, false otherwise
@@ -150,11 +117,9 @@ function cleanupStaleLocks(): boolean {
         // Check if process is running (signal 0 doesn't kill, just checks)
         process.kill(pid, 0)
         // Process exists, lock is valid
-        console.log("[App] Lock held by running process:", pid)
         return false
       } catch {
         // Process doesn't exist, clean up stale locks
-        console.log("[App] Cleaning stale locks (pid", pid, "not running)")
         const filesToRemove = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
         for (const file of filesToRemove) {
           const filePath = join(userDataPath, file)
@@ -290,13 +255,9 @@ if (gotTheLock) {
               label: "New Chat",
               accelerator: "CmdOrCtrl+N",
               click: () => {
-                console.log("[Menu] New Chat clicked (Cmd+N)")
                 const win = getWindow()
                 if (win) {
-                  console.log("[Menu] Sending shortcut:new-agent to renderer")
                   win.webContents.send("shortcut:new-agent")
-                } else {
-                  console.log("[Menu] No window found!")
                 }
               },
             },

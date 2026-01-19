@@ -26,36 +26,27 @@ export function getDefaultTerminalBg(isDark = true): string {
 function loadRenderer(xterm: XTerm): { dispose: () => void } {
   let renderer: WebglAddon | CanvasAddon | null = null
 
-  console.log("[Terminal:loadRenderer] Attempting to load WebGL addon...")
-
   try {
     const webglAddon = new WebglAddon()
-    console.log("[Terminal:loadRenderer] WebglAddon created")
 
     webglAddon.onContextLoss(() => {
-      console.log("[Terminal:loadRenderer] WebGL context lost, switching to Canvas")
       webglAddon.dispose()
       try {
         renderer = new CanvasAddon()
         xterm.loadAddon(renderer)
-        console.log("[Terminal:loadRenderer] Canvas fallback loaded after context loss")
       } catch {
-        console.log("[Terminal:loadRenderer] Canvas fallback failed")
+        // Canvas fallback failed
       }
     })
 
     xterm.loadAddon(webglAddon)
     renderer = webglAddon
-    console.log("[Terminal:loadRenderer] WebGL addon loaded successfully")
-  } catch (err) {
-    console.log("[Terminal:loadRenderer] WebGL failed:", err)
+  } catch {
     // WebGL not available, try Canvas
     try {
       renderer = new CanvasAddon()
       xterm.loadAddon(renderer)
-      console.log("[Terminal:loadRenderer] Canvas addon loaded as fallback")
-    } catch (canvasErr) {
-      console.log("[Terminal:loadRenderer] Canvas addon also failed:", canvasErr)
+    } catch {
       // Both failed, use xterm's default renderer
     }
   }
@@ -91,55 +82,32 @@ export function createTerminalInstance(
 ): TerminalInstance {
   const { initialTheme, isDark = true, onFileLinkClick, onUrlClick } = options
 
-  // Debug: Check container dimensions
-  const rect = container.getBoundingClientRect()
-  console.log("[Terminal:create] Container dimensions:", {
-    width: rect.width,
-    height: rect.height,
-    isConnected: container.isConnected,
-  })
-
   // Use provided theme, or get theme based on isDark
   const theme = initialTheme ?? getTerminalTheme(isDark)
   const terminalOptions = { ...TERMINAL_OPTIONS, theme }
 
   // 1. Create xterm instance
-  console.log("[Terminal:create] Step 1: Creating XTerm instance")
   const xterm = new XTerm(terminalOptions)
 
   // 2. Open in DOM first
-  console.log("[Terminal:create] Step 2: Opening in DOM")
   xterm.open(container)
 
-  // Debug: Check _renderService after open
-  const core = (xterm as unknown as { _core?: { _renderService?: unknown } })._core
-  console.log("[Terminal:create] After open - _renderService exists:", !!core?._renderService)
-
   // 3. Load fit addon
-  console.log("[Terminal:create] Step 3: Loading FitAddon")
   const fitAddon = new FitAddon()
   xterm.loadAddon(fitAddon)
 
   // 4. Load serialize addon for state persistence
-  console.log("[Terminal:create] Step 4: Loading SerializeAddon")
   const serializeAddon = new SerializeAddon()
   xterm.loadAddon(serializeAddon)
 
   // 5. Load GPU-accelerated renderer
-  console.log("[Terminal:create] Step 5: Loading renderer")
   const renderer = loadRenderer(xterm)
 
-  // Debug: Check dimensions after renderer
-  const coreAfter = (xterm as unknown as { _core?: { _renderService?: { dimensions?: unknown } } })._core
-  console.log("[Terminal:create] After renderer - dimensions:", coreAfter?._renderService?.dimensions)
-
   // 6. Set up query response suppression
-  console.log("[Terminal:create] Step 6: Setting up query suppression")
   const cleanupQuerySuppression = suppressQueryResponses(xterm)
 
   // 7. Set up URL link provider using official WebLinksAddon
   if (onUrlClick) {
-    console.log("[Terminal:create] Step 7: Registering WebLinksAddon")
     const webLinksAddon = new WebLinksAddon(
       (event: MouseEvent, uri: string) => {
         // Require Cmd+Click (Mac) or Ctrl+Click (Windows/Linux)
@@ -161,11 +129,9 @@ export function createTerminalInstance(
 
   // 8. Set up file path link provider
   if (onFileLinkClick) {
-    console.log("[Terminal:create] Step 8: Registering file path link provider")
     const filePathLinkProvider = new FilePathLinkProvider(
       xterm,
       (_event, path, line, column) => {
-        console.log("[Terminal:create] File path link clicked:", path, line, column)
         onFileLinkClick(path, line, column)
       }
     )
@@ -173,15 +139,11 @@ export function createTerminalInstance(
   }
 
   // 9. Fit to get actual dimensions
-  console.log("[Terminal:create] Step 9: Fitting terminal")
   try {
     fitAddon.fit()
-    console.log("[Terminal:create] Fit successful - cols:", xterm.cols, "rows:", xterm.rows)
-  } catch (err) {
-    console.log("[Terminal:create] Fit failed:", err)
+  } catch {
+    // Ignore fit errors
   }
-
-  console.log("[Terminal:create] Complete!")
 
   return {
     xterm,

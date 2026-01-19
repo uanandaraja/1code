@@ -33,14 +33,10 @@ export const publicProcedure = t.procedure
 export const middleware = t.middleware
 
 /**
- * Middleware to log procedure calls
+ * Middleware to log procedure calls (disabled in production)
  */
-export const loggerMiddleware = middleware(async ({ path, type, next }) => {
-  const start = Date.now()
-  const result = await next()
-  const duration = Date.now() - start
-  console.log(`[tRPC] ${type} ${path} - ${duration}ms`)
-  return result
+export const loggerMiddleware = middleware(async ({ next }) => {
+  return await next()
 })
 
 /**
