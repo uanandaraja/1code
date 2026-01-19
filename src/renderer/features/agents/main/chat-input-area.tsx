@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useCallback, useRef, useState, useEffect } from "react"
+import { memo, useCallback, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useAtom, useSetAtom } from "jotai"
 import { ChevronDown } from "lucide-react"
@@ -16,9 +16,9 @@ import {
   AgentIcon,
   AttachIcon,
   CheckIcon,
-  ClaudeCodeIcon,
   PlanIcon,
 } from "../../../components/ui/icons"
+import { ModelSelector } from "../components/model-selector"
 import { Kbd } from "../../../components/ui/kbd"
 import {
   PromptInput,
@@ -26,8 +26,7 @@ import {
   PromptInputContextItems,
 } from "../../../components/ui/prompt-input"
 import { cn } from "../../../lib/utils"
-import { trpc } from "../../../lib/trpc"
-import { isPlanModeAtom, selectedProviderAtom, selectedModelAtom } from "../atoms"
+import { isPlanModeAtom } from "../atoms"
 import { AgentsSlashCommand, COMMAND_PROMPTS, type SlashCommandOption } from "../commands"
 import { AgentSendButton } from "../components/agent-send-button"
 import {
@@ -45,17 +44,6 @@ import {
   clearSubChatDraft,
 } from "../lib/drafts"
 import { type SubChatFileChange } from "../atoms"
-
-// Model display helper
-function getModelDisplayName(modelId: string): string {
-  // Extract readable name from model ID
-  // e.g., "claude-opus-4-5" -> "Opus 4.5", "claude-sonnet-4-5" -> "Sonnet 4.5"
-  if (modelId.includes("opus")) return "Opus"
-  if (modelId.includes("sonnet")) return "Sonnet"
-  if (modelId.includes("haiku")) return "Haiku"
-  // For other models, just capitalize
-  return modelId.split("-").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" ")
-}
 
 export interface ChatInputAreaProps {
   // Editor ref - passed from parent for external access
@@ -252,14 +240,6 @@ export const ChatInputArea = memo(function ChatInputArea({
   const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasShownTooltipRef = useRef(false)
 
-  // Model dropdown state
-  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useAtom(selectedProviderAtom)
-  const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom)
-  
-  // Fetch available providers from OpenCode server
-  const { data: providersData } = trpc.opencode.providers.useQuery()
-
   // Plan mode - global atom
   const [isPlanMode, setIsPlanMode] = useAtom(isPlanModeAtom)
 
@@ -269,20 +249,6 @@ export const ChatInputArea = memo(function ChatInputArea({
   const currentDraftTextRef = useRef<string>("")
   currentSubChatIdRef.current = subChatId
   currentChatIdRef.current = parentChatId
-
-  // Keyboard shortcut: Cmd+/ to open model selector
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey && e.key === "/") {
-        e.preventDefault()
-        e.stopPropagation()
-        setIsModelDropdownOpen(true)
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown, true)
-    return () => window.removeEventListener("keydown", handleKeyDown, true)
-  }, [])
 
   // Save draft on blur
   const handleEditorBlur = useCallback(() => {
@@ -715,58 +681,7 @@ export const ChatInputArea = memo(function ChatInputArea({
                   </DropdownMenu>
 
                   {/* Model selector - dynamic from OpenCode providers */}
-                  <DropdownMenu
-                    open={isModelDropdownOpen}
-                    onOpenChange={setIsModelDropdownOpen}
-                  >
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50 outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/70">
-                        <ClaudeCodeIcon className="h-3.5 w-3.5" />
-                        <span>{getModelDisplayName(selectedModel)}</span>
-                        <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-[280px] max-h-[400px] overflow-y-auto">
-                      {(providersData?.providers ?? []).map((provider) => {
-                        const modelEntries = Object.entries(provider.models || {})
-                        if (modelEntries.length === 0) return null
-                        
-                        return (
-                          <div key={provider.id}>
-                            {/* Provider header */}
-                            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                              {provider.name}
-                            </div>
-                            {/* Models for this provider */}
-                            {modelEntries.map(([modelId, model]) => {
-                              const isSelected = selectedProvider === provider.id && selectedModel === modelId
-                              return (
-                                <DropdownMenuItem
-                                  key={`${provider.id}:${modelId}`}
-                                  onClick={() => {
-                                    setSelectedProvider(provider.id)
-                                    setSelectedModel(modelId)
-                                  }}
-                                  className="gap-2 justify-between pl-4"
-                                >
-                                  <span className="truncate">{model.name || getModelDisplayName(modelId)}</span>
-                                  {isSelected && (
-                                    <CheckIcon className="h-3.5 w-3.5 shrink-0" />
-                                  )}
-                                </DropdownMenuItem>
-                              )
-                            })}
-                          </div>
-                        )
-                      })}
-                      {/* Fallback if no providers loaded */}
-                      {(!providersData?.providers || providersData.providers.length === 0) && (
-                        <DropdownMenuItem disabled>
-                          <span className="text-muted-foreground">No connected providers</span>
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <ModelSelector enableKeyboardShortcut />
                 </div>
 
                 <div className="flex items-center gap-0.5 ml-auto flex-shrink-0">
